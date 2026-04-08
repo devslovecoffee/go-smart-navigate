@@ -1,28 +1,36 @@
 # Go Smart Navigate
 
-Unified go-to-definition + go-to-implementations for Go. When you press `F12` on an interface method, instead of jumping only to the interface definition, you get a picker showing both the definition and all implementations.
+**Cmd+click that understands interfaces.** When you cmd+click (or ctrl+click) a Go interface method, VS Code normally jumps to the interface definition - a dead end. This extension makes cmd+click show the interface definition *and* all concrete implementations, so you land where the real code lives.
 
-For concrete types and functions, behavior is identical to the default `F12` — a direct jump with no extra friction.
+For concrete types and functions, everything works exactly as before - no extra friction.
 
-## Keybindings
+## Features
 
-| Key | Behavior |
-|-----|----------|
-| `F12` | Smart navigate (replaces default Go to Definition for Go files) |
-| `Cmd+F12` / `Ctrl+F12` | Smart navigate (alternative binding) |
+- **Cmd+click on interface methods** opens VS Code's peek widget with the definition alongside all implementations
+- **F12 on interface methods** opens a quick pick showing definition, implementations, and usages
+- **Usages included** - when you're on a definition, F12 also shows where it's called
+- **Zero config** - works out of the box with gopls, stays out of the way for non-interface symbols
+- Filters out `vendor/` and `*.pb.go` noise automatically
+
+## How It Works
+
+| Action | On interface method | On concrete symbol |
+|--------|--------------------|--------------------|
+| **Cmd+click** / **Ctrl+click** | Peek with definition + implementations | Normal go-to-definition (unchanged) |
+| **F12** | Quick pick with definition, implementations, and usages | Direct jump to definition (unchanged) |
+| **Cmd+F12** / **Ctrl+F12** | Same as F12 | Same as F12 |
 
 ## Requirements
 
-- The [Go extension](https://marketplace.visualstudio.com/items?itemName=golang.go) must be installed and gopls running.
+- [Go extension](https://marketplace.visualstudio.com/items?itemName=golang.go) with gopls running
 
-## Cmd+click Support
+## Configuration
 
-The extension registers a supplementary definition provider for Go. When you cmd+click an interface method, VSCode's peek widget appears showing the definition (from gopls) alongside all implementations (from this extension). For concrete symbols, the extension stays out of the way — cmd+click behaves exactly as before.
-
-## Known Limitations
-
-- Locations inside `vendor/` directories and `*.pb.go` (protobuf generated) files are filtered out from the implementation list.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `goSmartNavigate.excludePatterns` | `["**/vendor/**", "**/*.pb.go"]` | Glob patterns for files to exclude from implementation results |
+| `goSmartNavigate.showUsages` | `true` | Show usage locations when navigating from a definition |
 
 ## Disabling
 
-If this extension conflicts with another, you can disable its keybindings by opening **Preferences: Open Keyboard Shortcuts** and searching for `goSmartNavigate.go`, then removing the bindings.
+If this extension conflicts with another, disable its keybindings via **Preferences: Open Keyboard Shortcuts** and search for `goSmartNavigate.go`.

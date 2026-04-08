@@ -39,7 +39,23 @@
         "mac": "cmd+f12",
         "when": "editorTextFocus && editorLangId == go"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Go Smart Navigate",
+      "properties": {
+        "goSmartNavigate.excludePatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["**/vendor/**", "**/*.pb.go"],
+          "description": "Glob patterns for files to exclude from implementation results."
+        },
+        "goSmartNavigate.showUsages": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show usage locations when navigating from a definition."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",

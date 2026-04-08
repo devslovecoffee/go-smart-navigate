@@ -85,8 +85,11 @@ async function resolveLocations(
     isSameLocation(def, cursorLoc)
   );
 
+  const config = vscode.workspace.getConfiguration("goSmartNavigate");
+  const showUsages: boolean = config.get("showUsages", true);
+
   let references: vscode.Location[] = [];
-  if (isOnDefinition) {
+  if (showUsages && isOnDefinition) {
     const rawReferences = await getReferences(uri, position);
     const knownKeys = new Set(
       [...definitions, ...rawImplementations].map(locationKey)
@@ -209,16 +212,33 @@ function isSameLocation(a: vscode.Location, b: vscode.Location): boolean {
 }
 
 function filterNoise(locations: vscode.Location[]): vscode.Location[] {
+  const config = vscode.workspace.getConfiguration("goSmartNavigate");
+  const patterns: string[] = config.get("excludePatterns", [
+    "**/vendor/**",
+    "**/*.pb.go",
+  ]);
+
   return locations.filter((loc) => {
-    const path = loc.uri.path;
-    if (path.includes("/vendor/")) {
-      return false;
-    }
-    if (path.endsWith(".pb.go")) {
-      return false;
+    const rel = vscode.workspace.asRelativePath(loc.uri, false);
+    for (const pattern of patterns) {
+      if (matchGlob(pattern, rel)) {
+        return false;
+      }
     }
     return true;
   });
+}
+
+function matchGlob(pattern: string, filePath: string): boolean {
+  // Convert a simple glob pattern to a regex.
+  // Supports *, **, and ? wildcards.
+  const regex = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*/g, "\0")
+    .replace(/\*/g, "[^/]*")
+    .replace(/\0/g, ".*")
+    .replace(/\?/g, "[^/]");
+  return new RegExp(`^${regex}$`).test(filePath);
 }
 
 async function isInterfaceLocation(loc: vscode.Location): Promise<boolean> {
