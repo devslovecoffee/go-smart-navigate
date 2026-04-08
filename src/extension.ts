@@ -4,6 +4,12 @@ interface PickItem extends vscode.QuickPickItem {
   location?: vscode.Location;
 }
 
+interface ResolvedLocations {
+  definitions: vscode.Location[];
+  implementations: vscode.Location[];
+  references: vscode.Location[];
+}
+
 // Reentrancy guard: when our provider calls executeDefinitionProvider,
 // that would call us again. The flag makes us return undefined on the
 // recursive call, so only gopls responds and we get its results cleanly.
@@ -33,39 +39,14 @@ export function activate(context: vscode.ExtensionContext) {
 
         isReentrant = true;
         try {
-          const [definitions, implementations] = await Promise.all([
-            getDefinitions(document.uri, position),
-            getImplementations(document.uri, position),
-          ]);
+          const { definitions, implementations, references } =
+            await resolveLocations(document.uri, position);
 
           if (token.isCancellationRequested || definitions.length === 0) {
             return undefined;
           }
 
-          const filteredImpls = filterNoise(
-            implementations.filter(
-              (impl) => !definitions.some((def) => isSameLocation(def, impl))
-            )
-          );
-
-          // Only include usages when on the definition
-          const cursorLoc = new vscode.Location(document.uri, position);
-          const isOnDefinition = definitions.some(
-            (def) => isSameLocation(def, cursorLoc)
-          );
-
-          let filteredRefs: vscode.Location[] = [];
-          if (isOnDefinition) {
-            const references = await getReferences(document.uri, position);
-            const knownKeys = new Set(
-              [...definitions, ...implementations].map(locationKey)
-            );
-            filteredRefs = filterNoise(
-              references.filter((ref) => !knownKeys.has(locationKey(ref)))
-            );
-          }
-
-          const extras = [...filteredImpls, ...filteredRefs];
+          const extras = [...implementations, ...references];
 
           if (
             extras.length > 0 &&
@@ -84,6 +65,40 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(defProvider);
 }
 
+async function resolveLocations(
+  uri: vscode.Uri,
+  position: vscode.Position
+): Promise<ResolvedLocations> {
+  const [definitions, rawImplementations] = await Promise.all([
+    getDefinitions(uri, position),
+    getImplementations(uri, position),
+  ]);
+
+  const implementations = filterNoise(
+    rawImplementations.filter(
+      (impl) => !definitions.some((def) => isSameLocation(def, impl))
+    )
+  );
+
+  const cursorLoc = new vscode.Location(uri, position);
+  const isOnDefinition = definitions.some((def) =>
+    isSameLocation(def, cursorLoc)
+  );
+
+  let references: vscode.Location[] = [];
+  if (isOnDefinition) {
+    const rawReferences = await getReferences(uri, position);
+    const knownKeys = new Set(
+      [...definitions, ...rawImplementations].map(locationKey)
+    );
+    references = filterNoise(
+      rawReferences.filter((ref) => !knownKeys.has(locationKey(ref)))
+    );
+  }
+
+  return { definitions, implementations, references };
+}
+
 async function smartNavigate(): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
@@ -93,7 +108,6 @@ async function smartNavigate(): Promise<void> {
   const document = editor.document;
   const position = editor.selection.active;
 
-  // Check that the Go extension is present
   const goExt = vscode.extensions.getExtension("golang.go");
   if (!goExt) {
     vscode.window.showWarningMessage(
@@ -108,69 +122,25 @@ async function smartNavigate(): Promise<void> {
   );
 
   try {
-    const [definitions, implementations] = await Promise.all([
-      getDefinitions(document.uri, position),
-      getImplementations(document.uri, position),
-    ]);
-
-    statusItem.dispose();
+    const { definitions, implementations, references } =
+      await resolveLocations(document.uri, position);
 
     if (definitions.length === 0) {
       vscode.window.showInformationMessage("No definition found.");
       return;
     }
 
-    const allLocations = deduplicateLocations([
-      ...definitions,
-      ...implementations,
-    ]);
-    const filteredImpls = filterNoise(
-      implementations.filter(
-        (impl) =>
-          !definitions.some((def) => isSameLocation(def, impl))
-      )
-    );
-
-    // Only fetch and show usages when inspecting the definition itself
-    const cursorLoc = new vscode.Location(document.uri, position);
-    const isOnDefinition = definitions.some(
-      (def) => isSameLocation(def, cursorLoc)
-    );
-
-    let filteredRefs: vscode.Location[] = [];
-    if (isOnDefinition) {
-      const references = await getReferences(document.uri, position);
-      const knownKeys = new Set(
-        [...definitions, ...implementations].map(locationKey)
-      );
-      filteredRefs = filterNoise(
-        references.filter((ref) => !knownKeys.has(locationKey(ref)))
-      );
-    }
-
-    if (filteredImpls.length === 0 && filteredRefs.length === 0) {
-      // No extra implementations or usages — jump directly to definition
+    if (implementations.length === 0 && references.length === 0) {
       await jumpDirect(definitions[0]);
       return;
     }
 
-    // Check if the definition is on an interface method
-    const defIsInterface = await isInterfaceLocation(definitions[0]);
-
-    if (!defIsInterface && filteredRefs.length === 0) {
-      // Concrete symbol with no usages — just jump
-      if (allLocations.length === 1) {
-        await jumpDirect(allLocations[0]);
-        return;
-      }
-    }
-
-    // Multiple meaningful locations — show picker
-    await showPicker(definitions, filteredImpls, filteredRefs);
+    await showPicker(definitions, implementations, references);
   } catch (err) {
-    statusItem.dispose();
-    // Fallback to standard definition jump on any error
+    console.error("Smart Navigate error:", err);
     await vscode.commands.executeCommand("editor.action.revealDefinition");
+  } finally {
+    statusItem.dispose();
   }
 }
 
@@ -225,31 +195,17 @@ function normalizeLocations(
     if (r instanceof vscode.Location) {
       return r;
     }
-    // LocationLink
     const link = r as vscode.LocationLink;
     return new vscode.Location(link.targetUri, link.targetRange);
   });
 }
 
 function locationKey(loc: vscode.Location): string {
-  return `${loc.uri.toString()}:${loc.range.start.line}`;
+  return `${loc.uri.toString()}:${loc.range.start.line}:${loc.range.start.character}`;
 }
 
 function isSameLocation(a: vscode.Location, b: vscode.Location): boolean {
   return locationKey(a) === locationKey(b);
-}
-
-function deduplicateLocations(locations: vscode.Location[]): vscode.Location[] {
-  const seen = new Set<string>();
-  const unique: vscode.Location[] = [];
-  for (const loc of locations) {
-    const key = locationKey(loc);
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(loc);
-    }
-  }
-  return unique;
 }
 
 function filterNoise(locations: vscode.Location[]): vscode.Location[] {
@@ -269,20 +225,18 @@ async function isInterfaceLocation(loc: vscode.Location): Promise<boolean> {
   try {
     const doc = await vscode.workspace.openTextDocument(loc.uri);
     const targetLine = loc.range.start.line;
-    const startLine = Math.max(0, targetLine - 5);
 
-    for (let i = targetLine; i >= startLine; i--) {
+    for (let i = targetLine; i >= 0; i--) {
       const lineText = doc.lineAt(i).text;
       if (/type\s+\w+\s+interface\s*\{/.test(lineText)) {
         return true;
       }
-      // Stop searching if we hit a closing brace (left the block)
       if (lineText.trim() === "}") {
         return false;
       }
     }
-  } catch {
-    // If we can't read the file, assume not an interface
+  } catch (err) {
+    console.error("Smart Navigate: failed to check interface location:", err);
   }
   return false;
 }
@@ -296,11 +250,7 @@ async function jumpDirect(location: vscode.Location): Promise<void> {
 }
 
 function relativePath(uri: vscode.Uri): string {
-  const wsFolder = vscode.workspace.getWorkspaceFolder(uri);
-  if (wsFolder) {
-    return uri.fsPath.replace(wsFolder.uri.fsPath + "/", "");
-  }
-  return uri.fsPath;
+  return vscode.workspace.asRelativePath(uri);
 }
 
 async function getLinePreview(loc: vscode.Location): Promise<string> {
@@ -319,9 +269,9 @@ async function showPicker(
 ): Promise<void> {
   const allLocs = [...definitions, ...implementations, ...usages];
   const previews = await Promise.all(allLocs.map(getLinePreview));
+  const previewMap = new Map(allLocs.map((loc, i) => [loc, previews[i]]));
 
   const items: PickItem[] = [];
-  let idx = 0;
 
   items.push({
     label: "Definition",
@@ -329,11 +279,10 @@ async function showPicker(
   });
   for (const def of definitions) {
     items.push({
-      label: `$(symbol-interface) ${previews[idx]}`,
+      label: `$(symbol-interface) ${previewMap.get(def)}`,
       detail: `${relativePath(def.uri)}:${def.range.start.line + 1}`,
       location: def,
     });
-    idx++;
   }
 
   if (implementations.length > 0) {
@@ -343,11 +292,10 @@ async function showPicker(
     });
     for (const impl of implementations) {
       items.push({
-        label: `$(symbol-method) ${previews[idx]}`,
+        label: `$(symbol-method) ${previewMap.get(impl)}`,
         detail: `${relativePath(impl.uri)}:${impl.range.start.line + 1}`,
         location: impl,
       });
-      idx++;
     }
   }
 
@@ -358,11 +306,10 @@ async function showPicker(
     });
     for (const usage of usages) {
       items.push({
-        label: `$(references) ${previews[idx]}`,
+        label: `$(references) ${previewMap.get(usage)}`,
         detail: `${relativePath(usage.uri)}:${usage.range.start.line + 1}`,
         location: usage,
       });
-      idx++;
     }
   }
 
