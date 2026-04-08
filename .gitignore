@@ -6,3 +6,5 @@ out/
 .claude/
 .cursor/
 .vscode/
+
+.DS_Store

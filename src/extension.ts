@@ -80,9 +80,9 @@ async function resolveLocations(
     )
   );
 
-  const cursorLoc = new vscode.Location(uri, position);
-  const isOnDefinition = definitions.some((def) =>
-    isSameLocation(def, cursorLoc)
+  const isOnDefinition = definitions.some(
+    (def) =>
+      def.uri.toString() === uri.toString() && def.range.contains(position)
   );
 
   const config = vscode.workspace.getConfiguration("goSmartNavigate");
