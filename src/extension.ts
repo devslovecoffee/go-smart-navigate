@@ -40,7 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
         isReentrant = true;
         try {
           const { definitions, implementations, references } =
-            await resolveLocations(document.uri, position);
+            await resolveLocations(document, position);
 
           if (token.isCancellationRequested || definitions.length === 0) {
             return undefined;
@@ -66,9 +66,10 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 async function resolveLocations(
-  uri: vscode.Uri,
+  document: vscode.TextDocument,
   position: vscode.Position
 ): Promise<ResolvedLocations> {
+  const uri = document.uri;
   const [definitions, rawImplementations] = await Promise.all([
     getDefinitions(uri, position),
     getImplementations(uri, position),
@@ -80,10 +81,12 @@ async function resolveLocations(
     )
   );
 
-  const isOnDefinition = definitions.some(
-    (def) =>
-      def.uri.toString() === uri.toString() && def.range.contains(position)
-  );
+  const wordRange = document.getWordRangeAtPosition(position);
+  const isOnDefinition = definitions.some((def) => {
+    if (def.uri.toString() !== uri.toString()) return false;
+    if (def.range.contains(position)) return true;
+    return wordRange !== undefined && wordRange.contains(def.range.start);
+  });
 
   const config = vscode.workspace.getConfiguration("goSmartNavigate");
   const showUsages: boolean = config.get("showUsages", true);
@@ -126,7 +129,7 @@ async function smartNavigate(): Promise<void> {
 
   try {
     const { definitions, implementations, references } =
-      await resolveLocations(document.uri, position);
+      await resolveLocations(document, position);
 
     if (definitions.length === 0) {
       vscode.window.showInformationMessage("No definition found.");
