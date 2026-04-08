@@ -2,7 +2,7 @@
   "name": "go-smart-navigate",
   "displayName": "Go Smart Navigate",
   "description": "Unified go-to-definition + go-to-implementations for Go interfaces",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "devslovecoffee",
   "engines": {
     "vscode": "^1.80.0"
@@ -45,8 +45,13 @@
       "properties": {
         "goSmartNavigate.excludePatterns": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["**/vendor/**", "**/*.pb.go"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/vendor/**",
+            "**/*.pb.go"
+          ],
           "description": "Glob patterns for files to exclude from implementation results."
         },
         "goSmartNavigate.showUsages": {
