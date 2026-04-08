@@ -1,0 +1,54 @@
+{
+  "name": "go-smart-navigate",
+  "displayName": "Go Smart Navigate",
+  "description": "Unified go-to-definition + go-to-implementations for Go interfaces",
+  "version": "1.0.0",
+  "publisher": "devslovecoffee",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "icon": "icon.png",
+  "activationEvents": [
+    "onLanguage:go"
+  ],
+  "main": "./out/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devslovecoffee/go-smart-navigate"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "goSmartNavigate.go",
+        "title": "Go: Smart Navigate (Definition + Implementations)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "goSmartNavigate.go",
+        "key": "f12",
+        "mac": "f12",
+        "when": "editorTextFocus && editorLangId == go"
+      },
+      {
+        "command": "goSmartNavigate.go",
+        "key": "ctrl+f12",
+        "mac": "cmd+f12",
+        "when": "editorTextFocus && editorLangId == go"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}
