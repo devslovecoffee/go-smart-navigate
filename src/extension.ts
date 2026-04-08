@@ -83,9 +83,13 @@ async function resolveLocations(
 
   const wordRange = document.getWordRangeAtPosition(position);
   const isOnDefinition = definitions.some((def) => {
-    if (def.uri.toString() !== uri.toString()) return false;
-    if (def.range.contains(position)) return true;
-    return wordRange !== undefined && wordRange.contains(def.range.start);
+    const sameFile = def.uri.toString() === uri.toString();
+    const rangeContains = def.range.contains(position);
+    const wordContains =
+      wordRange !== undefined && wordRange.contains(def.range.start);
+    if (!sameFile) return false;
+    if (rangeContains) return true;
+    return wordContains;
   });
 
   const config = vscode.workspace.getConfiguration("goSmartNavigate");
@@ -345,4 +349,4 @@ async function showPicker(
   }
 }
 
-export function deactivate() {}
+export function deactivate() { }

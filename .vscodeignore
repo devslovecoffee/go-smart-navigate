@@ -3,3 +3,5 @@ src/**
 tsconfig.json
 .gitignore
 *.map
+.claude/**
+.env

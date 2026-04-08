@@ -2,7 +2,7 @@
   "name": "go-smart-navigate",
   "displayName": "Go Smart Navigate",
   "description": "Unified go-to-definition + go-to-implementations for Go interfaces",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "devslovecoffee",
   "engines": {
     "vscode": "^1.80.0"
@@ -65,7 +65,8 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package"
+    "package": "vsce package",
+    "deploy": "tsc -p ./ && vsce package"
   },
   "devDependencies": {
     "@types/vscode": "^1.80.0",
