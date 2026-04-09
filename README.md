@@ -20,6 +20,31 @@ For concrete types and functions, everything works exactly as before - no extra 
 | **F12** | Quick pick with definition, implementations, and usages | Direct jump to definition (unchanged) |
 | **Cmd+F12** / **Ctrl+F12** | Same as F12 | Same as F12 |
 
+## Installation
+
+### Option 1: Install from Marketplace
+
+- [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=devslovecoffee.go-smart-navigate)
+- [Open VSX Registry](https://open-vsx.org/extension/devslovecoffee/go-smart-navigate)
+
+### Option 2: Build and Install Locally
+
+**Prerequisites:** [Node.js](https://nodejs.org/), [vsce](https://github.com/microsoft/vscode-vsce)
+
+1. Install dependencies:
+   ```
+   npm i
+   ```
+2. Build the extension:
+   ```
+   vsce package
+   ```
+   A `.vsix` file will be generated in the workspace directory.
+
+3. In VS Code, go to the Extensions tab, click `...`, then **Install from VSIX...** and select the built file.
+
+> **Tip:** You can drag and drop the `.vsix` file onto the Extensions tab to install it.
+
 ## Requirements
 
 - [Go extension](https://marketplace.visualstudio.com/items?itemName=golang.go) with gopls running
